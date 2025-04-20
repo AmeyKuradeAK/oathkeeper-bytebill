@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { CalendarClock, Download, HelpCircle, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -18,6 +17,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+// --- MOCK ROADMAP DATA ---
+const mockRoadmap = [
+  { year: 2025, age: 30, income: 60000, expenses: 35000, savings: 15000, focus: 'Emergency Fund' },
+  { year: 2026, age: 31, income: 63000, expenses: 36000, savings: 18000, focus: 'Increase SIPs' },
+  { year: 2027, age: 32, income: 66150, expenses: 37000, savings: 21000, focus: 'Start Equity Investments' },
+  { year: 2028, age: 33, income: 69457, expenses: 38000, savings: 24000, focus: 'Tax Planning' },
+  { year: 2029, age: 34, income: 72930, expenses: 39000, savings: 27000, focus: 'Diversify Portfolio' },
+  { year: 2030, age: 35, income: 76576, expenses: 40000, savings: 30000, focus: 'Plan for Child Education' },
+  { year: 2035, age: 40, income: 97656, expenses: 45000, savings: 40000, focus: 'Mid-term Goals Review' },
+  { year: 2045, age: 50, income: 159383, expenses: 60000, savings: 70000, focus: 'Retirement Planning' },
+  { year: 2050, age: 55, income: 203000, expenses: 70000, savings: 90000, focus: 'Pre-retirement Allocation' },
+  { year: 2055, age: 60, income: 258000, expenses: 80000, savings: 120000, focus: 'Retire & Drawdown' },
+];
+
 const Planning = () => {
   return (
     <div className="space-y-6">
@@ -32,14 +45,11 @@ const Planning = () => {
           <Download className="mr-2 h-4 w-4" /> Export Plan
         </Button>
       </div>
-      
-      {/* Input Section */}
+      {/* Input Section (kept for realism, but does nothing) */}
       <Card>
         <CardHeader>
           <CardTitle>Your Financial Inputs</CardTitle>
-          <CardDescription>
-            Provide your current financial details to generate a personalized plan
-          </CardDescription>
+          <CardDescription>Provide your current financial details to generate a personalized plan</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-6 sm:grid-cols-2">
@@ -154,25 +164,22 @@ const Planning = () => {
               </Select>
             </div>
           </div>
-          
-          <Button className="mt-6 w-full sm:w-auto">Generate Financial Plan</Button>
+          <Button className="mt-6 w-full sm:w-auto" disabled>Generate Financial Plan</Button>
         </CardContent>
       </Card>
-      
-      {/* Plan Timeline */}
+      {/* Plan Timeline (static table) */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle>Your 30-Year Financial Roadmap</CardTitle>
-            <CardDescription>
-              Projected financial journey based on your inputs
-            </CardDescription>
+            <CardTitle>Your Financial Roadmap</CardTitle>
+            <CardDescription>Projected financial journey based on your inputs</CardDescription>
           </div>
           <CalendarClock className="h-5 w-5 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border overflow-hidden">
-            <table className="w-full text-sm">
+          {/* Responsive horizontal scroll for table */}
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full min-w-[700px] text-sm">
               <thead>
                 <tr className="bg-muted/40 text-left">
                   <th className="p-3 font-medium">Year</th>
@@ -184,36 +191,18 @@ const Planning = () => {
                 </tr>
               </thead>
               <tbody>
-                {[
-                  { year: 2025, age: 30, income: 60000, expenses: 42000, savings: 18000, focus: "Growth Stocks (70%), Bonds (20%), Cash (10%)" },
-                  { year: 2030, age: 35, income: 76500, expenses: 51000, savings: 109500, focus: "Growth Stocks (65%), Index Funds (25%), Bonds (10%)" },
-                  { year: 2035, age: 40, income: 97500, expenses: 62000, savings: 253100, focus: "Index Funds (50%), Dividend Stocks (30%), Bonds (20%)" },
-                  { year: 2040, age: 45, income: 124600, expenses: 75200, savings: 436900, focus: "Dividend Stocks (40%), Index Funds (40%), Bonds (20%)" },
-                  { year: 2045, age: 50, income: 159000, expenses: 91200, savings: 693500, focus: "Dividend Stocks (45%), Bonds (35%), Index Funds (20%)" },
-                  { year: 2050, age: 55, income: 202800, expenses: 110400, savings: 1080300, focus: "Bonds (50%), Dividend Stocks (40%), Index Funds (10%)" },
-                  { year: 2055, age: 60, income: 258700, expenses: 133800, savings: 1596000, focus: "Bonds (60%), Dividend Stocks (30%), Cash (10%)" },
-                  { year: 2060, age: 65, income: 0, expenses: 162000, savings: 1933000, focus: "Bonds (70%), Dividend Stocks (20%), Cash (10%)" },
-                ].map((row) => (
-                  <tr key={row.year} className="border-b last:border-0">
+                {mockRoadmap.map((row, idx) => (
+                  <tr key={idx} className="border-b last:border-0">
                     <td className="p-3 font-medium">{row.year}</td>
                     <td className="p-3">{row.age}</td>
-                    <td className="p-3 text-right">${row.income.toLocaleString()}</td>
-                    <td className="p-3 text-right">${row.expenses.toLocaleString()}</td>
-                    <td className="p-3 text-right font-medium">${row.savings.toLocaleString()}</td>
-                    <td className="p-3 hidden md:table-cell text-muted-foreground">{row.focus}</td>
+                    <td className="p-3 text-right">₹{row.income.toLocaleString('en-IN')}</td>
+                    <td className="p-3 text-right">₹{row.expenses.toLocaleString('en-IN')}</td>
+                    <td className="p-3 text-right">₹{row.savings.toLocaleString('en-IN')}</td>
+                    <td className="p-3 hidden md:table-cell">{row.focus}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-          
-          <div className="mt-6 p-4 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
-            <h4 className="font-medium flex items-center mb-2">
-              <Info className="h-4 w-4 mr-2" /> Financial Projection Notes
-            </h4>
-            <p className="text-sm">
-              This projection assumes an average annual return of 7% on investments, 2.5% inflation rate, and your stated 5% annual income growth. Adjust your inputs for different scenarios.
-            </p>
           </div>
         </CardContent>
       </Card>

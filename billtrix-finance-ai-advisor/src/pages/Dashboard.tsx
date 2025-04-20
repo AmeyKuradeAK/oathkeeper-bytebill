@@ -1,52 +1,165 @@
-
-import React from 'react';
-import { ArrowRight, TrendingUp, TrendingDown, Target, DollarSign } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ArrowRight, TrendingUp, TrendingDown, Target, Wallet, Mail, Calendar } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Link } from 'react-router-dom';
-
-// Mock data - will be replaced with actual API calls
-const user = {
-  name: 'Alex',
-  monthlyBudget: 3000,
-  totalSpent: 1850,
-  savingsGoal: 1000,
-  currentSavings: 750,
-};
-
-const categories = [
-  { name: 'Food', spent: 450, budget: 500, color: 'bg-green-500' },
-  { name: 'Rent', spent: 800, budget: 800, color: 'bg-blue-500' },
-  { name: 'Entertainment', spent: 200, budget: 300, color: 'bg-purple-500' },
-  { name: 'Utilities', spent: 150, budget: 200, color: 'bg-yellow-500' },
-  { name: 'Shopping', spent: 250, budget: 200, color: 'bg-red-500' },
-];
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 const Dashboard = () => {
-  const remainingBudget = user.monthlyBudget - user.totalSpent;
-  const percentSpent = (user.totalSpent / user.monthlyBudget) * 100;
-  const savingsPercentage = (user.currentSavings / user.savingsGoal) * 100;
-  
-  return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">
-          Welcome back, {user.name}
-        </h2>
-        <div>
-          <Button className="shadow-sm">
-            <DollarSign className="mr-2 h-4 w-4" /> Add Expense
-          </Button>
-        </div>
-      </div>
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<any>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [totalSpent, setTotalSpent] = useState(0);
+  const [expenses, setExpenses] = useState<any[]>([]); // <-- Store all expenses for current month
+  const [loading, setLoading] = useState(true);
+  const [subscription, setSubscription] = useState<any>(null);
+  const [error, setError] = useState<string>("");
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+  const fetchProfileAndExpenses = async () => {
+    setLoading(true);
+    setError("");
+    if (!user || !user.id) {
+      setError("User not authenticated. Please log in again.");
+      setLoading(false);
+      return;
+    }
+    try {
+      console.log('Dashboard user.id:', user.id);
+      let { data: profileData, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      if (profileError) {
+        setError('Supabase profile fetch error: ' + profileError.message);
+        console.error('Supabase profile fetch error:', profileError.message);
+      }
+      if (!profileData) {
+        const defaultProfile = {
+          id: user.id,
+          title: user.email,
+          level: 1,
+          streakDays: 0,
+          monthlyBudget: 0,
+          savingsGoal: 0,
+          currentPoints: 0,
+          nextLevel: 200
+        };
+        await supabase.from('user_profiles').insert([defaultProfile]);
+        profileData = defaultProfile;
+      }
+      setProfile(profileData);
+      // Fetch all expenses for this user (TEMP: remove date filter for debugging)
+      const { data: expensesData, error: expensesError } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('user_id', user.id);
+      if (expensesError) {
+        setError('Supabase expenses fetch error: ' + expensesError.message);
+        console.error('Supabase expenses fetch error:', expensesError.message);
+        setExpenses([]);
+      } else {
+        setExpenses(expensesData || []);
+        console.log('Dashboard fetched ALL user expenses:', expensesData);
+      }
+    } catch (err: any) {
+      setError('Unexpected error: ' + (err.message || err.toString()));
+      console.error('Unexpected error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    fetchProfileAndExpenses();
+    // --- REAL-TIME SUBSCRIPTION ---
+    if (subscription) {
+      supabase.removeChannel(subscription);
+      setSubscription(null);
+    }
+    const channel = supabase.channel('realtime-expenses-dashboard')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'expenses',
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        fetchProfileAndExpenses();
+      })
+      .subscribe();
+    setSubscription(channel);
+    // Auto-refetch on tab focus
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchProfileAndExpenses();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      supabase.removeChannel(channel);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [user]);
+
+  if (loading) return <div className="p-8 text-center">Loading dashboard...</div>;
+  if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
+  const safeProfile = profile || { title: user?.email, monthlyBudget: 0, savingsGoal: 0 };
+
+  // --- Calculations using up-to-date expenses ---
+  const totalSpentCalc = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const remainingBudget = Number(safeProfile.monthlyBudget ?? 0) - Number(totalSpentCalc ?? 0);
+  const percentSpent = (Number(totalSpentCalc ?? 0) / (Number(safeProfile.monthlyBudget ?? 1))) * 100;
+  const currentSavings = remainingBudget;
+  const savingsPercentage = (Number(currentSavings) / (Number(safeProfile.savingsGoal ?? 1))) * 100;
+  // Category breakdown
+  const grouped = expenses.reduce((acc: any[], curr: any) => {
+    const amt = Number(curr.amount) || 0;
+    const cat = acc.find((c: any) => c.name === curr.category);
+    if (cat) {
+      cat.spent += amt;
+    } else {
+      acc.push({ name: curr.category, spent: amt });
+    }
+    return acc;
+  }, []);
+  // --- Weekly Trend Calculation ---
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const diffToMonday = (dayOfWeek + 6) % 7;
+  const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+  const isoStartOfWeek = startOfWeek.toISOString();
+  const weeklyExpenses = expenses.filter((e: any) => e.date >= isoStartOfWeek);
+  let weeklySpent = 0;
+  const dailyTotals = Array(7).fill(0);
+  weeklyExpenses.forEach((e: any) => {
+    const d = new Date(e.date);
+    const day = (d.getDay() + 6) % 7;
+    dailyTotals[day] += Number(e.amount) || 0;
+    weeklySpent += Number(e.amount) || 0;
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+          <p className="text-muted-foreground">
+            Overview of your financial activity
+          </p>
+        </div>
+        <Button onClick={fetchProfileAndExpenses} disabled={loading} className="md:self-start">
+          Refresh
+        </Button>
+      </div>
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {/* Monthly Overview Card */}
-        <Card className="card-hover">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+        <Card className="min-w-0 break-words">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium truncate">
               Monthly Overview
             </CardTitle>
             <Badge variant={percentSpent > 80 ? 'destructive' : 'default'}>
@@ -54,156 +167,91 @@ const Dashboard = () => {
             </Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${user.totalSpent.toLocaleString()}</div>
+            <div className="text-2xl font-bold truncate">₹{Number(totalSpentCalc ?? 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              of ${user.monthlyBudget.toLocaleString()} budget
+              of ₹{Number(safeProfile.monthlyBudget ?? 0).toLocaleString()} budget
             </p>
             <Progress value={percentSpent} className="h-2 mt-4" />
             <div className="mt-3 flex items-center justify-between text-sm">
-              <p>Remaining: <span className="font-medium">${remainingBudget.toLocaleString()}</span></p>
+              <p>Remaining: <span className="font-medium">₹{Number(remainingBudget).toLocaleString()}</span></p>
               <Link to="/expenses" className="text-primary flex items-center">
                 Details <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </div>
           </CardContent>
         </Card>
-
         {/* Weekly Trend Card */}
-        <Card className="card-hover">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+        <Card className="min-w-0 break-words">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium truncate">
               Weekly Trend
             </CardTitle>
-            <div className="flex items-center">
-              <TrendingDown className="h-4 w-4 text-green-500 mr-1" />
-              <span className="text-green-500 text-sm">-12%</span>
-            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$420</div>
+            <div className="text-2xl font-bold truncate">₹{weeklySpent.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
               spent this week
             </p>
             <div className="mt-4 h-[60px] grid grid-cols-7 gap-1 items-end">
-              {[30, 45, 25, 60, 75, 40, 20].map((value, i) => (
+              {dailyTotals.map((value, i) => (
                 <div key={i} className="flex flex-col items-center">
                   <div 
                     className="bg-primary/70 rounded-sm w-full" 
-                    style={{ height: `${value}%` }}
+                    style={{ height: `${Math.min(value / Math.max(...dailyTotals, 1) * 100, 100)}%` }}
                   />
                   <span className="text-[10px] mt-1">
-                    {['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}
+                    {['M','T','W','T','F','S','S'][i]}
                   </span>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
-
-        {/* Savings Goal Card */}
-        <Card className="card-hover">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Savings Goal
+        {/* Category Breakdown Card */}
+        <Card className="min-w-0 break-words">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium truncate">
+              By Category
             </CardTitle>
-            <Target className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${user.currentSavings.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              of ${user.savingsGoal.toLocaleString()} goal
-            </p>
-            <Progress value={savingsPercentage} className="h-2 mt-4" />
-            <div className="mt-3 flex items-center justify-between text-sm">
-              <p>Progress: <span className="font-medium">{savingsPercentage.toFixed(0)}%</span></p>
-              <Link to="/goals" className="text-primary flex items-center">
-                All Goals <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
-            </div>
+            <ul className="space-y-2">
+              {grouped.length === 0 ? (
+                <li className="text-muted-foreground">No expenses this month.</li>
+              ) : (
+                grouped.map((cat) => (
+                  <li key={cat.name} className="flex items-center justify-between">
+                    <span>{cat.name}</span>
+                    <span className="font-semibold">₹{cat.spent.toLocaleString()}</span>
+                  </li>
+                ))
+              )}
+            </ul>
           </CardContent>
         </Card>
       </div>
-
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-        {/* Expense by Category */}
-        <Card className="card-hover">
-          <CardHeader>
-            <CardTitle>Expenses by Category</CardTitle>
-            <CardDescription>Your spending breakdown this month</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {categories.map((category) => {
-                const percentUsed = (category.spent / category.budget) * 100;
-                return (
-                  <div key={category.name} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{category.name}</span>
-                      <span className="text-sm">
-                        ${category.spent} of ${category.budget}
-                        {category.spent > category.budget && (
-                          <Badge variant="destructive" className="ml-2">Over</Badge>
-                        )}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full ${category.color}`} 
-                        style={{ width: `${Math.min(percentUsed, 100)}%` }} 
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Navigation */}
-        <Card className="card-hover">
-          <CardHeader>
-            <CardTitle>Quick Access</CardTitle>
-            <CardDescription>Manage your finances</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <Link to="/expenses" className="flex flex-col items-center p-4 border rounded-md hover:bg-secondary transition-colors">
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                <DollarSign className="h-6 w-6 text-primary" />
-              </div>
-              <span className="text-sm font-medium">Expenses</span>
+      {/* --- Quick Navigation Block (Bottom, 4 navs in a square box with icons and small labels) --- */}
+      <div className="mt-8 flex justify-center">
+        <div className="bg-card border rounded-2xl shadow-lg w-full max-w-xs p-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Link to="/expenses" className="flex flex-col items-center justify-center p-4 rounded-lg border bg-background hover:bg-accent transition">
+              <Wallet className="h-8 w-8 text-primary" />
+              <span className="mt-2 text-xs text-muted-foreground font-medium">Expenses</span>
             </Link>
-            
-            <Link to="/goals" className="flex flex-col items-center p-4 border rounded-md hover:bg-secondary transition-colors">
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                <Target className="h-6 w-6 text-primary" />
-              </div>
-              <span className="text-sm font-medium">Goals</span>
+            <Link to="/receipts" className="flex flex-col items-center justify-center p-4 rounded-lg border bg-background hover:bg-accent transition">
+              <Mail className="h-8 w-8 text-primary" />
+              <span className="mt-2 text-xs text-muted-foreground font-medium">Receipts</span>
             </Link>
-            
-            <Link to="/predictions" className="flex flex-col items-center p-4 border rounded-md hover:bg-secondary transition-colors">
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                <TrendingUp className="h-6 w-6 text-primary" />
-              </div>
-              <span className="text-sm font-medium">Predictions</span>
+            <Link to="/planning" className="flex flex-col items-center justify-center p-4 rounded-lg border bg-background hover:bg-accent transition">
+              <Calendar className="h-8 w-8 text-primary" />
+              <span className="mt-2 text-xs text-muted-foreground font-medium">Planning</span>
             </Link>
-            
-            <Link to="/receipts" className="flex flex-col items-center p-4 border rounded-md hover:bg-secondary transition-colors">
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <span className="text-sm font-medium">Receipts</span>
+            <Link to="/predictions" className="flex flex-col items-center justify-center p-4 rounded-lg border bg-background hover:bg-accent transition">
+              <TrendingUp className="h-8 w-8 text-primary" />
+              <span className="mt-2 text-xs text-muted-foreground font-medium">Predictions</span>
             </Link>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex justify-end">
-        <Badge variant="outline" className="flex items-center">
-          <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
-          Data updated 2 mins ago
-        </Badge>
+          </div>
+        </div>
       </div>
     </div>
   );

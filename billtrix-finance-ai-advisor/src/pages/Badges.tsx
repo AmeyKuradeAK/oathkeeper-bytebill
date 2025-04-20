@@ -1,33 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Award, Lock, Star, Trophy, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-
-// Mock data for badges and achievements
-const earnedBadges = [
-  { id: 1, name: 'Budget Master', description: 'Stay within budget for 3 consecutive months', icon: 'award', date: '2025-03-15' },
-  { id: 2, name: 'Early Bird', description: 'Pay all bills before due date for 2 months', icon: 'clock', date: '2025-02-28' },
-  { id: 3, name: 'Goal Setter', description: 'Create and fund 3 financial goals', icon: 'target', date: '2025-01-20' },
-  { id: 4, name: 'Data Driven', description: 'Log in and check your dashboard for 14 consecutive days', icon: 'bar-chart', date: '2025-04-02' },
-];
-
-const lockedBadges = [
-  { id: 5, name: 'Debt Destroyer', description: 'Pay off a loan or credit card debt completely', icon: 'scissors', progress: 85 },
-  { id: 6, name: 'Savings Streak', description: 'Save money for 6 consecutive months', icon: 'trending-up', progress: 50 },
-  { id: 7, name: 'Finance Guru', description: 'Read all financial education articles', icon: 'book-open', progress: 30 },
-  { id: 8, name: 'Budget Ninja', description: 'Stay 15% under budget for a month', icon: 'zap', progress: 60 },
-];
-
-// Current user profile/stats
-const userProfile = {
-  title: 'The Saver',
-  level: 3,
-  streakDays: 7,
-  totalBadges: earnedBadges.length,
-  nextLevel: 200,
-  currentPoints: 145,
-};
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
+import { Badge as BadgeType } from '@/lib/supabase';
+import { BADGE_DEFINITIONS } from '@/lib/badges';
 
 interface BadgeIconProps {
   icon: string;
@@ -55,6 +34,70 @@ const BadgeIcon: React.FC<BadgeIconProps> = ({ icon, className }) => {
 };
 
 const Badges = () => {
+  const { user } = useAuth();
+  const [badges, setBadges] = useState<BadgeType[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchBadges = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('user_badges')
+        .select('*')
+        .eq('user_id', user.id);
+      if (!error && data) setBadges(data);
+      setLoading(false);
+    };
+    fetchBadges();
+  }, [user]);
+
+  // Map user badges by id for quick lookup
+  const userBadgesMap = badges.reduce((map, b) => {
+    map[b.id.toString()] = b;
+    return map;
+  }, {} as Record<string, BadgeType>);
+
+  // Merge BADGE_DEFINITIONS with user badges to show all (earned & not earned)
+  const allBadges = BADGE_DEFINITIONS.map(def => {
+    const userBadge = userBadgesMap[def.id];
+    return {
+      ...def,
+      ...userBadge,
+      is_earned: userBadge?.is_earned || false,
+      date: userBadge?.date,
+      progress: userBadge?.progress,
+    };
+  });
+
+  const earnedBadges = allBadges.filter(b => b.is_earned);
+  const lockedBadges = allBadges.filter(b => !b.is_earned);
+
+  // Calculate dynamic title and achievements
+  let dynamicTitle = 'Newbie';
+  if (earnedBadges.some(b => b.id === 'budget-master')) dynamicTitle = 'Budget Master';
+  else if (earnedBadges.some(b => b.id === 'goal-getter')) dynamicTitle = 'Goal Getter';
+  else if (earnedBadges.some(b => b.id === 'savings-streak')) dynamicTitle = 'Savings Star';
+  else if (earnedBadges.some(b => b.id === 'expense-tracker')) dynamicTitle = 'Expense Tracker';
+  else if (earnedBadges.some(b => b.id === 'early-bird')) dynamicTitle = 'Early Bird';
+  else if (earnedBadges.some(b => b.id === 'debt-destroyer')) dynamicTitle = 'Debt Destroyer';
+
+  const achievedList = earnedBadges.length
+    ? earnedBadges.map(b => b.name).join(', ')
+    : 'No badges achieved yet';
+
+  const userProfile = {
+    title: dynamicTitle,
+    level: 1 + earnedBadges.length,
+    streakDays: 7,
+    totalBadges: earnedBadges.length,
+    nextLevel: 1 + BADGE_DEFINITIONS.length,
+    currentPoints: earnedBadges.length * 50, // Example: 50 points per badge
+    achievedList,
+  };
+
+  if (loading) return <div className="p-8 text-center">Loading badges...</div>;
+
   return (
     <div className="space-y-6">
       <div>
@@ -74,6 +117,7 @@ const Badges = () => {
             <div className="space-y-1">
               <div className="text-sm text-muted-foreground">Your Title</div>
               <h3 className="text-2xl font-bold">{userProfile.title}</h3>
+              <div className="text-xs mt-1 text-muted-foreground">Achievements: {userProfile.achievedList}</div>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">Level {userProfile.level}</Badge>
                 <Badge variant="outline" className="flex items-center">
@@ -106,19 +150,14 @@ const Badges = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
             {earnedBadges.map((badge) => (
-              <div key={badge.id} className="flex flex-col items-center p-4 border rounded-lg text-center">
+              <div key={badge.id} className="flex flex-col items-center p-4 border rounded-lg text-center break-words w-full min-w-0">
                 <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
                   <BadgeIcon icon={badge.icon} className="h-6 w-6 text-primary" />
                 </div>
-                <h4 className="font-medium">{badge.name}</h4>
-                <p className="text-xs text-muted-foreground mt-1 mb-3">
-                  {badge.description}
-                </p>
-                <Badge variant="outline" className="text-xs">
-                  Earned on {new Date(badge.date).toLocaleDateString()}
-                </Badge>
+                <div className="font-semibold text-base mb-1 truncate w-full" title={badge.name}>{badge.name}</div>
+                <div className="text-xs text-muted-foreground break-words w-full">{badge.description}</div>
               </div>
             ))}
           </div>

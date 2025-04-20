@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "outDir": "build",
+    "module": "NodeNext",
+    "target": "ES2020",
+    "esModuleInterop": true,
+    "allowJs": false,
+    "declaration": false,
+    "sourceMap": false,
+    "rootDir": "src",
+    "strict": false,
+    "skipLibCheck": true,
+    "moduleResolution": "NodeNext"
+  },
+  "include": ["src/server/**/*.ts"]
+}

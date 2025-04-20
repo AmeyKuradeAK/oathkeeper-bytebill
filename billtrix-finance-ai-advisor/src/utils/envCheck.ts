@@ -7,7 +7,8 @@
 // List of required environment variables
 const requiredEnvVars = [
   'VITE_SUPABASE_URL',
-  'VITE_SUPABASE_ANON_KEY'
+  'VITE_SUPABASE_ANON_KEY',
+  // 'VITE_GEMINI_API_KEY' // Gemini key is backend-only; do not require in frontend
 ];
 
 export function checkEnvironmentVariables() {

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Bell, CreditCard, Globe, Lock, Mail, User, Wallet } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,11 +47,12 @@ const Settings = () => {
             </div>
             <div className="space-y-2">
               <label htmlFor="currency" className="text-sm font-medium">Preferred Currency</label>
-              <Select defaultValue="usd">
+              <Select defaultValue="inr">
                 <SelectTrigger id="currency">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="inr">INR - Indian Rupees</SelectItem>
                   <SelectItem value="usd">USD - United States Dollar</SelectItem>
                   <SelectItem value="eur">EUR - Euro</SelectItem>
                   <SelectItem value="gbp">GBP - British Pound</SelectItem>

@@ -24,7 +24,7 @@ export const supabase = createClient(
 
 // Database types
 export type Badge = {
-  id: number;
+  id: string; // Changed from number to string for consistency with badge definitions
   name: string;
   description: string;
   icon: string;
@@ -76,4 +76,5 @@ export type UserProfile = {
   currentPoints: number;
   nextLevel: number;
   gmail_token?: string;
+  xp?: number; // Added XP field for gamification
 };

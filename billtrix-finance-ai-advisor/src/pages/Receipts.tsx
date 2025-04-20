@@ -63,7 +63,8 @@ const Receipts = () => {
       }
       console.log('Google Access Token:', accessToken); // For debugging
 
-      const response = await fetch('http://localhost:5000/api/sync-gmail', {
+      // Changed to relative path for Vite proxy compatibility
+      const response = await fetch('/api/sync-gmail', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
