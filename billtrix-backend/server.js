@@ -16,20 +16,26 @@ app.post('/api/sync-gmail', async (req, res) => {
   }
 
   // Gmail API search query for finance/receipts
-  // Restrict to last 365 days and likely transaction keywords
   const now = new Date();
   const lastYear = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
   const after = Math.floor(lastYear.getTime() / 1000);
-  // Gmail query: after:<unix_timestamp> and transaction keywords
-  const query = encodeURIComponent(`after:${after} (transaction OR payment OR bill OR invoice OR paid OR receipt OR statement)`);
-  const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=50`;
+  // Fetch ANY 4 emails (no filter)
+  const query = '';
+  const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=4`;
 
   try {
     // 1. List message IDs matching the query
     const listRes = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
-    const listData = await listRes.json();
+    const listText = await listRes.text();
+    let listData;
+    try {
+      listData = JSON.parse(listText);
+    } catch (parseErr) {
+      console.error('Failed to parse Gmail listData:', listText);
+      return res.status(500).json({ message: 'Failed to parse Gmail API response', raw: listText });
+    }
     console.log('Gmail listData:', listData); // DEBUG
 
     if (!listData.messages) {
@@ -44,7 +50,14 @@ app.post('/api/sync-gmail', async (req, res) => {
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-      const msgData = await msgRes.json();
+      const msgText = await msgRes.text();
+      let msgData;
+      try {
+        msgData = JSON.parse(msgText);
+      } catch (parseErr) {
+        console.error('Failed to parse Gmail msgData:', msgText);
+        continue; // skip this message
+      }
       emails.push(msgData);
     }
 
@@ -172,7 +185,7 @@ app.post('/api/sync-gmail', async (req, res) => {
 
     // 4. (Optional) Store parsed data in Supabase
 
-    res.json({
+    return res.json({
       message: 'Fetched filtered emails',
       emails: parsedEmails,
       summary: {
@@ -183,7 +196,8 @@ app.post('/api/sync-gmail', async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching Gmail:', err);
-    res.status(500).json({ message: 'Failed to fetch Gmail', error: err.message });
+    // Always return JSON error
+    return res.status(500).json({ message: 'Failed to fetch Gmail', error: err.message || String(err) });
   }
 });
 

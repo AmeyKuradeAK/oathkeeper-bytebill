@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { ChartContainer } from '@/components/ui/chart';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -111,10 +112,14 @@ const Dashboard = () => {
 
   // --- Calculations using up-to-date expenses ---
   const totalSpentCalc = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  const remainingBudget = Number(safeProfile.monthlyBudget ?? 0) - Number(totalSpentCalc ?? 0);
-  const percentSpent = (Number(totalSpentCalc ?? 0) / (Number(safeProfile.monthlyBudget ?? 1))) * 100;
+  // Set budget to 2x spent if budget is missing or zero
+  const computedBudget = Number(safeProfile.monthlyBudget) > 0 ? Number(safeProfile.monthlyBudget) : totalSpentCalc * 2;
+  const remainingBudget = computedBudget - Number(totalSpentCalc ?? 0);
+  const percentSpent = (Number(totalSpentCalc ?? 0) / (computedBudget || 1)) * 100;
+  // Set savings goal to 2x spent if goal is missing or zero
+  const computedGoal = Number(safeProfile.savingsGoal) > 0 ? Number(safeProfile.savingsGoal) : totalSpentCalc * 2;
   const currentSavings = remainingBudget;
-  const savingsPercentage = (Number(currentSavings) / (Number(safeProfile.savingsGoal ?? 1))) * 100;
+  const savingsPercentage = (Number(currentSavings) / (computedGoal || 1)) * 100;
   // Category breakdown
   const grouped = expenses.reduce((acc: any[], curr: any) => {
     const amt = Number(curr.amount) || 0;
@@ -169,7 +174,7 @@ const Dashboard = () => {
           <CardContent>
             <div className="text-2xl font-bold truncate">₹{Number(totalSpentCalc ?? 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              of ₹{Number(safeProfile.monthlyBudget ?? 0).toLocaleString()} budget
+              of ₹{Number(computedBudget).toLocaleString()} budget
             </p>
             <Progress value={percentSpent} className="h-2 mt-4" />
             <div className="mt-3 flex items-center justify-between text-sm">
@@ -207,6 +212,27 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
+        {/* Savings Progress Card */}
+        <Card className="min-w-0 break-words">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium truncate">
+              Savings Progress
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold truncate">₹{Number(currentSavings).toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">
+              of ₹{Number(computedGoal).toLocaleString()} goal
+            </p>
+            <Progress value={savingsPercentage} className="h-2 mt-4" />
+            <div className="mt-3 flex items-center justify-between text-sm">
+              <p>Saved: <span className="font-medium">{savingsPercentage.toFixed(0)}%</span></p>
+              <Link to="/planning" className="text-primary flex items-center">
+                Plan <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
         {/* Category Breakdown Card */}
         <Card className="min-w-0 break-words">
           <CardHeader className="pb-2">
@@ -226,6 +252,48 @@ const Dashboard = () => {
                   </li>
                 ))
               )}
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+      {/* Upcoming Deadlines Card */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+        <Card className="min-w-0 break-words">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium truncate">
+              Upcoming Deadlines
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {/* TODO: Replace with real deadlines from goals, for now placeholder */}
+              <li className="flex items-center justify-between">
+                <span>Goal: Buy Laptop</span>
+                <span className="text-xs text-muted-foreground">in 12 days</span>
+              </li>
+              <li className="flex items-center justify-between">
+                <span>Bill: Credit Card</span>
+                <span className="text-xs text-muted-foreground">in 5 days</span>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+        {/* Recent Transactions Card */}
+        <Card className="min-w-0 break-words">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium truncate">
+              Recent Transactions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {expenses.slice(-5).reverse().map((e, idx) => (
+                <li key={e.id || idx} className="flex items-center justify-between">
+                  <span>{e.category || 'Other'}: {e.description || 'No desc'}</span>
+                  <span className="font-semibold">₹{Number(e.amount).toLocaleString()}</span>
+                </li>
+              ))}
+              {expenses.length === 0 && <li className="text-muted-foreground">No recent transactions.</li>}
             </ul>
           </CardContent>
         </Card>

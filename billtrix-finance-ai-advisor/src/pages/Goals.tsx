@@ -147,25 +147,25 @@ const Goals = () => {
       </div>
 
       {/* Goals List */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="flex flex-col gap-6 w-full max-w-3xl mx-auto px-2 sm:px-4">
         {goals.map((goal) => (
-          <Card key={goal.id} className="min-w-0 break-words">
+          <Card key={goal.id} className="p-4 sm:p-6 w-full min-h-[150px] flex flex-col justify-between shadow-lg">
             <CardHeader>
-              <CardTitle className="text-base font-semibold truncate">{goal.name}</CardTitle>
-              <CardDescription className="truncate">Target: {goal.target.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</CardDescription>
+              <CardTitle className="text-lg sm:text-xl font-semibold break-words whitespace-normal">{goal.name}</CardTitle>
+              <CardDescription className="break-words whitespace-normal">Target: {goal.target.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                <div className="flex flex-col md:flex-row md:items-center gap-2 flex-1 min-w-0">
+              <div className="flex flex-col gap-4 w-full">
+                <div className="flex flex-col sm:flex-row flex-wrap items-center gap-2 sm:gap-4 w-full">
                   <span className="text-xs text-muted-foreground whitespace-nowrap">Current Saved</span>
-                  <span className="font-bold truncate">₹{goal.current.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
-                  <div className="w-full md:w-32 bg-muted/40 rounded-full h-3 overflow-hidden mx-2">
+                  <span className="font-bold">₹{goal.current.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
+                  <div className="w-full sm:w-64 bg-muted/40 rounded-full h-3 overflow-hidden mx-2">
                     <div className="bg-primary h-3" style={{ width: `${Math.min(100, (goal.current / goal.target) * 100)}%` }} />
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap">0</span>
-                  <span className="truncate">{goal.target.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
+                  <span className="">{goal.target.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
                 </div>
-                <div className="flex gap-2 mt-2 md:mt-0 md:ml-2">
+                <div className="flex gap-2 mt-2">
                   <Button size="icon" variant="ghost" aria-label="Edit Goal" onClick={() => {/* TODO: implement edit */}}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13h3l8-8a2.828 2.828 0 10-4-4l-8 8v3zm0 0v3h3" /></svg>
                   </Button>
